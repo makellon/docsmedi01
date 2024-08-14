@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental X-ray Analysis Chatbot</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --chatbot-color: #0062B1; 
+        }
+        body {
+            background-image: url('static/background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        #chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        #chat-widget.minimized {
+            height: 50px;
+        }
+        #chat-widget.maximized {
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            right: auto;
+            bottom: auto;
+        }
+        #chat-header {
+            background-color: var(--chatbot-color);
+            color: white;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #chat-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        #chat-input {
+            padding: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .chat-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-controls i {
+            cursor: pointer;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #e6f2ff;
+            padding: 8px;
+            border-radius: 10px;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #f0f0f0;
+            padding: 8px;
+            border-radius: 10px;
+        }
+        .typing-indicator {
+            display: none;
+            text-align: left;
+            padding: 5px 10px;
+        }
+        .typing-indicator span {
+            height: 10px;
+            width: 10px;
+            float: left;
+            margin: 0 1px;
+            background-color: var(--chatbot-color);
+            display: block;
+            border-radius: 50%;
+            opacity: 0.4;
+        }
+        .typing-indicator span:nth-of-type(1) { animation: 1s blink infinite 0.3333s; }
+        .typing-indicator span:nth-of-type(2) { animation: 1s blink infinite 0.6666s; }
+        .typing-indicator span:nth-of-type(3) { animation: 1s blink infinite 0.9999s; }
+        @keyframes blink {
+            50% { opacity: 1; }
+        }
+        .soap-analysis h7 {
+            font-weight: bold;
+            display: block;
+            margin-top: 10px;
+        }
+        .soap-analysis p {
+            margin-bottom: 10px;
+        }
+        #chat-body ul {
+            padding-left: 20px;
+        }
+        .annotated-image {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        .annotated-image:hover {
+            transform: scale(1.05);
+        }
+        .image-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 1200px;
+        }
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .finding-item {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-widget" class="minimized">
+        <div id="chat-header">
+            <h5 class="m-0">Dental X-ray Analysis Chatbot</h5>
+            <div class="chat-controls">
+                <i class="fas fa-minus minimize-chat"></i>
+                <i class="fas fa-expand maximize-chat"></i>
+                <i class="fas fa-times close-chat"></i>
+            </div>
+        </div>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+        <div id="chat-input">
+            <form id="chat-form">
+                <div class="input-group">
+                    <input type="file" id="file-input" class="form-control" accept="image/*" style="display: none;">
+                    <input type="text" id="user-input" class="form-control" placeholder="Type your message or upload an X-ray...">
+                    <button type="button" id="upload-btn" class="btn btn-outline-secondary">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="imageModal" class="image-modal">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('.minimize-chat').click(function() {
+                $('#chat-widget').addClass('minimized');
+            });
+
+            $('.maximize-chat').click(function() {
+                $('#chat-widget').toggleClass('maximized');
+                if ($('#chat-widget').hasClass('maximized')) {
+                    $('#chat-widget').css({
+                        'width': '100%',
+                        'height': '100%',
+                        'top': '0',
+                        'left': '0',
+                        'right': 'auto',
+                        'bottom': 'auto'
+                    });
+                } else {
+                    $('#chat-widget').css({
+                        'width': '350px',
+                        'height': '500px',
+                        'top': 'auto',
+                        'left': 'auto',
+                        'right': '20px',
+                        'bottom': '20px'
+                    });
+                }
+            });
+
+            $('.close-chat').click(function() {
+                $('#chat-widget').addClass('minimized');
+                $('#chat-body, #chat-input').hide();
+            });
+
+            $('#chat-header').click(function() {
+                if ($('#chat-widget').hasClass('minimized')) {
+                    $('#chat-widget').removeClass('minimized');
+                    $('#chat-body, #chat-input').show();
+                }
+            });
+
+            $('#upload-btn').click(function() {
+                $('#file-input').click();
+            });
+
+            $('#file-input').change(function() {
+                var fileName = $(this).val().split('\\').pop();
+                $('#user-input').val('Uploaded: ' + fileName);
+                $('#chat-form').submit();
+            });
+
+            $('#chat-form').on('submit', function(e) {
+                e.preventDefault();
+                var userInput = $('#user-input').val();
+                var fileInput = $('#file-input')[0];
+
+                if (userInput || fileInput.files.length > 0) {
+                    appendMessage('user', userInput);
+                    $('#user-input').val('');
+
+                    $('.typing-indicator').show();
+
+                    if (fileInput.files.length > 0) {
+                        // Handle file upload
+                        var formData = new FormData();
+                        formData.append('file', fileInput.files[0]);
+
+                        $.ajax({
+                            url: '/upload',
+                            type: 'POST',
+                            data: formData,
+                            contentType: false,
+                            processData: false,
+                            success: function(response) {
+                                handleResponse(response);
+                            },
+                            error: function(xhr, status, error) {
+                                appendMessage('bot', 'Error: ' + error);
+                                $('.typing-indicator').hide();
+                            }
+                        });
+
+                        fileInput.value = '';
+                    } else {
+                        // Handle text message
+                        $.ajax({
+                            url: '/chat',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({message: userInput}),
+                            success: function(response) {
+                                handleResponse(response);
+                            },
+                            error: function(xhr, status, error) {
+                                appendMessage('bot', 'Error: ' + error);
+                                $('.typing-indicator').hide();
+                            }
+                        });
+                    }
+                }
+            });
+
+            function appendMessage(sender, message) {
+                var messageClass = sender === 'user' ? 'user-message' : 'bot-message';
+                $('#chat-messages').append('<div class="chat-message ' + messageClass + '">' + message + '</div>');
+                $('#chat-body').scrollTop($('#chat-body')[0].scrollHeight);
+            }
+
+            function handleResponse(response) {
+                $('.typing-indicator').hide();
+                
+                if (response.analysis) {
+                    // Handle X-ray analysis response
+                    var formattedAnalysis = '<div class="soap-analysis">';
+                    for (var section in response.analysis.soap) {
+                        formattedAnalysis += '<h7>' + section.charAt(0).toUpperCase() + section.slice(1) + ':</h7>';
+                        formattedAnalysis += '<p>' + response.analysis.soap[section].join(' ') + '</p>';
+                    }
+                    formattedAnalysis += '</div>';
+                    
+                    formattedAnalysis += '<h6>Findings:</h6><ul>';
+                    response.analysis.findings.forEach(function(finding) {
+                        formattedAnalysis += '<li class="finding-item" style="background-color: ' + finding.color + '20;">' + 
+                                             'Finding ' + finding.number + ': ' + finding.description + '</li>';
+                    });
+                    formattedAnalysis += '</ul>';
+                    
+                    appendMessage('bot', formattedAnalysis);
+                    
+                    // Display the annotated image
+                    if (response.annotated_image) {
+                        var imageUrl = response.annotated_image;
+                        appendMessage('bot', '<img src="' + imageUrl + '" class="annotated-image" onclick="openImageModal(this.src)">');
+                    } else {
+                        appendMessage('bot', 'Error: Annotated image not available');
+                    }
+                } else if (response.response) {
+                    // Handle chat response
+                    appendMessage('bot', response.response);
+                } else {
+                    // Handle unexpected response format
+                    appendMessage('bot', 'Error: Unexpected response format');
+                }
+            }
+        });
+
+        function openImageModal(imageSrc) {
+            $('#modalImage').attr('src', imageSrc);
+            $('#imageModal').css('display', 'block');
+        }
+
+        $('.close-modal').click(function() {
+            $('#imageModal').css('display', 'none');
+        });
+
+        $(window).click(function(event) {
+            if (event.target == document.getElementById('imageModal')) {
+                $('#imageModal').css('display', 'none');
+            }
+        });
+    </script>
+</body>
+</html>
