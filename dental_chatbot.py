@@ -60,15 +60,12 @@ Plan: Suggest a treatment plan or further actions based on the findings."""
         response = self._get_claude_response()
         parsed_response = self._parse_soap_response(response)
 
-        # Annotate the image and get numbered findings
         annotated_image, numbered_findings = annotate_image(image_path, parsed_response['findings'])
 
-        # Save the annotated image
         annotated_filename = f"annotated_{os.path.basename(image_path)}"
         annotated_filepath = os.path.join(os.path.dirname(image_path), annotated_filename)
         annotated_image.save(annotated_filepath)
 
-        # Update the parsed response with numbered findings
         parsed_response['findings'] = numbered_findings
         parsed_response['annotated_image_path'] = annotated_filepath
 
